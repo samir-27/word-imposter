@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",                          /* Modern JavaScript features */
+    "module": "NodeNext",                        /* Standard for modern Node.js */
+    "moduleResolution": "NodeNext",
+    "rootDir": "./src",                          /* Where our TypeScript files live */
+    "outDir": "./dist",                          /* Where compiled JS will go for production */
+    "esModuleInterop": true,                     /* Enables standard import syntax for CommonJS modules */
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,                              /* Enables strict type checking */
+    "noImplicitAny": true,                       /* Prevents accidental 'any' types */
+    "skipLibCheck": true                         /* Skips type checking of declaration files in node_modules */
+  },
+  "include": ["src/**/*"]
+}

@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-dark: #0F172A;
+  --color-brand-card: #1E293B;
+  --color-brand-accent: #6366F1;
+  --color-brand-imposter: #EF4444;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-brand-dark);
+  color: #F8FAFC;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  min-height: 100vh;
+}
