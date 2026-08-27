@@ -12,10 +12,14 @@ interface ServerToClientEvents {
 interface ClientToServerEvents {
   create_room: (
     data: { playerName: string },
-    callback: (response: { success: boolean; roomCode?: string; error?: string }) => void
+    callback: (response: { success: boolean; roomCode?: string; sessionToken?: string; error?: string }) => void
   ) => void;
   join_room: (
     data: { roomCode: string; playerName: string },
+    callback: (response: { success: boolean; sessionToken?: string; error?: string }) => void
+  ) => void;
+  reconnect_session: (
+    data: { roomCode: string; sessionToken: string },
     callback: (response: { success: boolean; error?: string }) => void
   ) => void;
   leave_room: () => void;
@@ -31,7 +35,6 @@ interface ClientToServerEvents {
   restart_game: (callback: (response: { success: boolean; error?: string }) => void) => void;
 }
 
-// Automatically detect host IP (e.g., 192.168.1.8 on phones, localhost on PC)
 const currentHost = window.location.hostname;
 const SERVER_URL = `http://${currentHost}:5000`;
 

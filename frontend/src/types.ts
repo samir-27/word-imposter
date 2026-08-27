@@ -7,6 +7,7 @@ export interface Player {
   socketId: string;
   name: string;
   isHost: boolean;
+  isConnected: boolean;
 }
 
 export type GameState =

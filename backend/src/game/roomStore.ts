@@ -1,8 +1,10 @@
 // backend/src/game/roomStore.ts
-import { ActiveGame, Player, PublicGameState, ClueEntry, VoteTally } from "../types/socket.js";
+import { ActiveGame, Player, PublicGameState, ClueEntry, VoteTally, SecretRoleData } from "../types/socket.js";
 import { getRandomWordPair } from "./wordBank.js";
 
 const rooms = new Map<string, ActiveGame>();
+// Track disconnect grace period timers: "roomCode:playerId" -> NodeJS.Timeout
+const disconnectTimers = new Map<string, NodeJS.Timeout>();
 
 export function generateRoomCode(): string {
   const characters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -53,7 +55,74 @@ export function addPlayerToRoom(roomCode: string, player: Player): ActiveGame | 
   return room;
 }
 
-export function removePlayerFromRoom(roomCode: string, playerId: string): ActiveGame | null {
+// Disconnect handling with 60-second grace period
+export function handlePlayerDisconnect(
+  roomCode: string,
+  playerId: string,
+  onExpire: () => void
+): ActiveGame | null {
+  const room = getRoom(roomCode);
+  if (!room) return null;
+
+  const player = room.players.find((p) => p.id === playerId);
+  if (!player) return null;
+
+  player.isConnected = false;
+
+  const timerKey = `${roomCode}:${playerId}`;
+  if (disconnectTimers.has(timerKey)) {
+    clearTimeout(disconnectTimers.get(timerKey)!);
+  }
+
+  // Set 60-second timer to permanently remove player if they don't return
+  const timer = setTimeout(() => {
+    disconnectTimers.delete(timerKey);
+    removePlayerPermanently(roomCode, playerId);
+    onExpire();
+  }, 60000);
+
+  disconnectTimers.set(timerKey, timer);
+  return room;
+}
+
+// Reconnect an existing session with new socket ID
+export function reconnectPlayer(
+  roomCode: string,
+  sessionToken: string,
+  newSocketId: string
+): { room: ActiveGame; player: Player; secret: SecretRoleData | null } | null {
+  const room = getRoom(roomCode);
+  if (!room) return null;
+
+  const player = room.players.find((p) => p.sessionToken === sessionToken);
+  if (!player) return null;
+
+  // Clear grace timer
+  const timerKey = `${roomCode}:${player.id}`;
+  if (disconnectTimers.has(timerKey)) {
+    clearTimeout(disconnectTimers.get(timerKey)!);
+    disconnectTimers.delete(timerKey);
+  }
+
+  // Update socket and online flag
+  player.socketId = newSocketId;
+  player.isConnected = true;
+
+  // Re-calculate secret role info if game is active
+  let secret: SecretRoleData | null = null;
+  if (room.gameState !== "LOBBY") {
+    const isImposter = player.id === room.imposterId;
+    secret = {
+      role: isImposter ? "IMPOSTER" : "INNOCENT",
+      word: isImposter ? room.wordPair.imposterWord : room.wordPair.innocentWord,
+      category: room.wordPair.category,
+    };
+  }
+
+  return { room, player, secret };
+}
+
+export function removePlayerPermanently(roomCode: string, playerId: string): ActiveGame | null {
   const room = getRoom(roomCode);
   if (!room) return null;
 
@@ -108,9 +177,7 @@ export function submitClue(roomCode: string, playerId: string, rawClue: string):
   else if (room.gameState === "ROUND_2") currentRoundNum = 2;
   else if (room.gameState === "ROUND_3") currentRoundNum = 3;
 
-  if (!currentRoundNum) {
-    throw new Error("Clues cannot be submitted during this phase.");
-  }
+  if (!currentRoundNum) throw new Error("Clues cannot be submitted during this phase.");
 
   const cleanClue = rawClue.trim() || "[Timed Out]";
 
@@ -122,19 +189,16 @@ export function submitClue(roomCode: string, playerId: string, rawClue: string):
   };
   room.clues.push(newClueEntry);
 
-  // Advance turn to next player
   room.currentTurnIndex += 1;
   room.timerSecondsRemaining = 30;
 
-  // If every player finished their turn in this round:
   if (room.currentTurnIndex >= room.players.length) {
-    room.currentTurnIndex = 0; // Reset for next phase
-
+    room.currentTurnIndex = 0;
     if (room.gameState === "ROUND_1") {
       room.gameState = "ROUND_2";
     } else if (room.gameState === "ROUND_2") {
       room.gameState = "VOTING_1";
-      room.timerSecondsRemaining = 45; // 45 seconds for discussion and voting
+      room.timerSecondsRemaining = 45;
     } else if (room.gameState === "ROUND_3") {
       room.gameState = "FINAL_VOTING";
       room.timerSecondsRemaining = 45;

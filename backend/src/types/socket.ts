@@ -1,12 +1,12 @@
-// backend/src/types/socket.ts
-
 export type Role = "INNOCENT" | "IMPOSTER";
 
 export interface Player {
   id: string;
   socketId: string;
+  sessionToken: string; // Permanent secret token stored in client's storage
   name: string;
   isHost: boolean;
+  isConnected: boolean; // Tracks online/offline status
 }
 
 export type GameState =
@@ -58,7 +58,7 @@ export interface ActiveGame {
   clues: ClueEntry[];
   votes: { voterId: string; targetId: string; round: 1 | 2 }[];
   gameResult: GameResult | null;
-  currentTurnIndex: number; // Index in players array whose turn it is to give a clue
+  currentTurnIndex: number;
   timerSecondsRemaining: number;
 }
 
@@ -86,10 +86,14 @@ export interface SecretRoleData {
 export interface ClientToServerEvents {
   create_room: (
     data: { playerName: string },
-    callback: (response: { success: boolean; roomCode?: string; error?: string }) => void
+    callback: (response: { success: boolean; roomCode?: string; sessionToken?: string; error?: string }) => void
   ) => void;
   join_room: (
     data: { roomCode: string; playerName: string },
+    callback: (response: { success: boolean; sessionToken?: string; error?: string }) => void
+  ) => void;
+  reconnect_session: (
+    data: { roomCode: string; sessionToken: string },
     callback: (response: { success: boolean; error?: string }) => void
   ) => void;
   leave_room: () => void;
@@ -117,5 +121,6 @@ export interface InterServerEvents {}
 
 export interface SocketData {
   playerId?: string;
+  sessionToken?: string;
   roomCode?: string;
 }

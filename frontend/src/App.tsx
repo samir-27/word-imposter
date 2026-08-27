@@ -1,5 +1,5 @@
 // frontend/src/App.tsx
-import "./App.css";
+import './App.css'
 import { useState, useEffect } from "react";
 import { socket } from "./socket";
 import type { PublicGameState, SecretRoleData } from "./types";
@@ -16,6 +16,25 @@ export default function App() {
   const [currentRoom, setCurrentRoom] = useState<PublicGameState | null>(null);
   const [secretRole, setSecretRole] = useState<SecretRoleData | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Reconnection check on initial load
+  useEffect(() => {
+    const savedRoomCode = sessionStorage.getItem("word_imposter_room");
+    const savedToken = sessionStorage.getItem("word_imposter_token");
+
+    if (savedRoomCode && savedToken) {
+      socket.emit(
+        "reconnect_session",
+        { roomCode: savedRoomCode, sessionToken: savedToken },
+        (res) => {
+          if (!res.success) {
+            sessionStorage.removeItem("word_imposter_room");
+            sessionStorage.removeItem("word_imposter_token");
+          }
+        }
+      );
+    }
+  }, []);
 
   useEffect(() => {
     function onRoomUpdated(data: PublicGameState) {
@@ -40,7 +59,12 @@ export default function App() {
     if (!playerName.trim()) return setError("Please enter your name.");
     setError(null);
     socket.emit("create_room", { playerName }, (res) => {
-      if (!res.success && res.error) setError(res.error);
+      if (res.success && res.roomCode && res.sessionToken) {
+        sessionStorage.setItem("word_imposter_room", res.roomCode);
+        sessionStorage.setItem("word_imposter_token", res.sessionToken);
+      } else if (res.error) {
+        setError(res.error);
+      }
     });
   };
 
@@ -49,12 +73,19 @@ export default function App() {
     if (!roomCode.trim()) return setError("Please enter a room code.");
     setError(null);
     socket.emit("join_room", { roomCode, playerName }, (res) => {
-      if (!res.success && res.error) setError(res.error);
+      if (res.success && res.sessionToken) {
+        sessionStorage.setItem("word_imposter_room", roomCode.toUpperCase());
+        sessionStorage.setItem("word_imposter_token", res.sessionToken);
+      } else if (res.error) {
+        setError(res.error);
+      }
     });
   };
 
   const handleLeaveRoom = () => {
     socket.emit("leave_room");
+    sessionStorage.removeItem("word_imposter_room");
+    sessionStorage.removeItem("word_imposter_token");
     setCurrentRoom(null);
     setSecretRole(null);
     setError(null);
