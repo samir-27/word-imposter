@@ -74,6 +74,7 @@ export interface PublicGameState {
   timerSecondsRemaining: number;
   votedPlayerIds: string[];
   gameResult: GameResult | null;
+  networkUrl: string;
 }
 
 export interface SecretRoleData {

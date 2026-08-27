@@ -1,6 +1,7 @@
 // backend/src/game/roomStore.ts
 import { ActiveGame, Player, PublicGameState, ClueEntry, VoteTally, SecretRoleData } from "../types/socket.js";
 import { getRandomWordPair } from "./wordBank.js";
+import { getLocalIpAddress } from "../utils/lan.js";
 
 const rooms = new Map<string, ActiveGame>();
 // Track disconnect grace period timers: "roomCode:playerId" -> NodeJS.Timeout
@@ -332,6 +333,10 @@ export function getPublicGameState(room: ActiveGame): PublicGameState {
     ? room.votes.filter((v) => v.round === votingRound).map((v) => v.voterId)
     : [];
 
+  // Construct the LAN URL that external mobile devices should navigate to
+  const localIp = getLocalIpAddress();
+  const networkUrl = `http://${localIp}:5173`;
+
   return {
     roomCode: room.roomCode,
     hostId: room.hostId,
@@ -344,5 +349,6 @@ export function getPublicGameState(room: ActiveGame): PublicGameState {
     timerSecondsRemaining: room.timerSecondsRemaining,
     votedPlayerIds,
     gameResult: room.gameResult,
+    networkUrl,
   };
 }
