@@ -5,6 +5,7 @@ import cors from "cors";
 import { Server } from "socket.io";
 import { config } from "./config/env.js";
 import { initializeSockets } from "./sockets/index.js";
+import { getLocalIpAddress } from "./utils/lan.js";
 import {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -13,7 +14,22 @@ import {
 } from "./types/socket.js";
 
 const app = express();
-app.use(cors({ origin: config.clientUrl, credentials: true }));
+
+// Allow localhost and any local LAN IP origin
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps/curl) or from any local port 5173
+      if (!origin || origin.includes(":5173") || origin.includes("localhost")) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Permissive for local testing
+      }
+    },
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
 app.get("/api/health", (_req: Request, res: Response) => {
@@ -28,12 +44,19 @@ const io = new Server<
   InterServerEvents,
   SocketData
 >(httpServer, {
-  cors: { origin: config.clientUrl, methods: ["GET", "POST"] },
+  cors: {
+    origin: "*", // Allow all origins on local Wi-Fi
+    methods: ["GET", "POST"],
+  },
 });
 
-// Initialize all socket event handlers
 initializeSockets(io);
 
-httpServer.listen(config.port, () => {
-  console.log(`🚀 [Server] Running on http://localhost:${config.port}`);
+const localIp = getLocalIpAddress();
+
+// Bind to 0.0.0.0 so external devices on Wi-Fi can reach the server
+httpServer.listen(config.port, "0.0.0.0", () => {
+  console.log(`🚀 [Server] Running locally:  http://localhost:${config.port}`);
+  console.log(`📱 [LAN Access] Network URL:  http://${localIp}:${config.port}`);
+  console.log(`🌐 [Socket.IO] Listening on all network interfaces`);
 });

@@ -31,6 +31,10 @@ interface ClientToServerEvents {
   restart_game: (callback: (response: { success: boolean; error?: string }) => void) => void;
 }
 
-export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io("http://localhost:5000", {
+// Automatically detect host IP (e.g., 192.168.1.8 on phones, localhost on PC)
+const currentHost = window.location.hostname;
+const SERVER_URL = `http://${currentHost}:5000`;
+
+export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(SERVER_URL, {
   autoConnect: true,
 });

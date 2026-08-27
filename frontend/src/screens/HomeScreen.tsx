@@ -1,5 +1,5 @@
 // frontend/src/screens/HomeScreen.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 interface HomeScreenProps {
   onCreateRoom: (playerName: string) => void;
@@ -9,6 +9,15 @@ interface HomeScreenProps {
 export const HomeScreen: React.FC<HomeScreenProps> = ({ onCreateRoom, onJoinRoom }) => {
   const [playerName, setPlayerName] = useState("");
   const [roomCode, setRoomCode] = useState("");
+
+  useEffect(() => {
+    // Read ?code=XXXXX from URL if scanned via QR Code
+    const params = new URLSearchParams(window.location.search);
+    const codeParam = params.get("code");
+    if (codeParam) {
+      setRoomCode(codeParam.toUpperCase());
+    }
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -28,7 +37,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onCreateRoom, onJoinRoom
 
       <button
         onClick={() => onCreateRoom(playerName)}
-        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 font-semibold rounded-lg shadow-lg transition active:scale-[0.98]"
+        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 font-bold rounded-xl shadow-lg transition active:scale-[0.98]"
       >
         Create New Room
       </button>
@@ -50,7 +59,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onCreateRoom, onJoinRoom
         />
         <button
           onClick={() => onJoinRoom(roomCode, playerName)}
-          className="w-1/2 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 font-semibold rounded-lg transition active:scale-[0.98]"
+          className="w-1/2 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 font-bold rounded-lg transition active:scale-[0.98]"
         >
           Join Room
         </button>
