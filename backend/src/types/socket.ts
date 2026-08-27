@@ -32,6 +32,28 @@ export interface ClueEntry {
   round: 1 | 2 | 3;
 }
 
+export interface VoteEntry {
+  voterId: string;
+  targetId: string; // Player ID or "ANOTHER_ROUND"
+  round: 1 | 2;     // Voting round 1 (after R2) or voting round 2 (final)
+}
+
+export interface VoteTally {
+  targetId: string;
+  targetName: string;
+  count: number;
+}
+
+export interface GameResult {
+  winner: "PLAYERS" | "IMPOSTER";
+  reason: string;
+  imposterId: string;
+  imposterName: string;
+  innocentWord: string;
+  imposterWord: string;
+  voteTallies: VoteTally[];
+}
+
 export interface ActiveGame {
   roomCode: string;
   hostId: string;
@@ -40,6 +62,8 @@ export interface ActiveGame {
   imposterId: string;
   wordPair: WordPair;
   clues: ClueEntry[];
+  votes: VoteEntry[];
+  gameResult: GameResult | null;
 }
 
 export interface PublicGameState {
@@ -50,7 +74,9 @@ export interface PublicGameState {
   currentRound: number;
   category: string;
   clues: ClueEntry[];
-  submittedPlayerIds: string[]; // List of player IDs who submitted for CURRENT round
+  submittedPlayerIds: string[];
+  votedPlayerIds: string[];
+  gameResult: GameResult | null;
 }
 
 export interface SecretRoleData {
@@ -75,6 +101,11 @@ export interface ClientToServerEvents {
     data: { clue: string },
     callback: (response: { success: boolean; error?: string }) => void
   ) => void;
+  cast_vote: (
+    data: { targetId: string },
+    callback: (response: { success: boolean; error?: string }) => void
+  ) => void;
+  restart_game: (callback: (response: { success: boolean; error?: string }) => void) => void;
 }
 
 // Server -> Client

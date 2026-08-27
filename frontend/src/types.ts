@@ -25,6 +25,22 @@ export interface ClueEntry {
   round: 1 | 2 | 3;
 }
 
+export interface VoteTally {
+  targetId: string;
+  targetName: string;
+  count: number;
+}
+
+export interface GameResult {
+  winner: "PLAYERS" | "IMPOSTER";
+  reason: string;
+  imposterId: string;
+  imposterName: string;
+  innocentWord: string;
+  imposterWord: string;
+  voteTallies: VoteTally[];
+}
+
 export interface PublicGameState {
   roomCode: string;
   hostId: string;
@@ -34,6 +50,8 @@ export interface PublicGameState {
   category: string;
   clues: ClueEntry[];
   submittedPlayerIds: string[];
+  votedPlayerIds: string[];
+  gameResult: GameResult | null;
 }
 
 export interface SecretRoleData {

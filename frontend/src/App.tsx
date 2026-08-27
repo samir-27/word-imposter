@@ -9,6 +9,8 @@ import { ErrorBanner } from "./components/ErrorBanner";
 import { HomeScreen } from "./screens/HomeScreen";
 import { LobbyScreen } from "./screens/LobbyScreen";
 import { GameScreen } from "./screens/GameScreen";
+import { VotingScreen } from "./screens/VotingScreen";
+import { GameOverScreen } from "./screens/GameOverScreen";
 
 export default function App() {
   const [currentRoom, setCurrentRoom] = useState<PublicGameState | null>(null);
@@ -72,6 +74,20 @@ export default function App() {
     });
   };
 
+  const handleCastVote = (targetId: string) => {
+    setError(null);
+    socket.emit("cast_vote", { targetId }, (res) => {
+      if (!res.success && res.error) setError(res.error);
+    });
+  };
+
+  const handleRestartGame = () => {
+    setError(null);
+    socket.emit("restart_game", (res) => {
+      if (!res.success && res.error) setError(res.error);
+    });
+  };
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-slate-950 text-slate-100">
       <Card>
@@ -90,11 +106,26 @@ export default function App() {
           />
         )}
 
-        {currentRoom && currentRoom.gameState !== "LOBBY" && (
+        {currentRoom && ["ROUND_1", "ROUND_2", "ROUND_3"].includes(currentRoom.gameState) && (
           <GameScreen
             room={currentRoom}
             secret={secretRole}
             onSubmitClue={handleSubmitClue}
+          />
+        )}
+
+        {currentRoom && ["VOTING_1", "FINAL_VOTING"].includes(currentRoom.gameState) && (
+          <VotingScreen
+            room={currentRoom}
+            onCastVote={handleCastVote}
+          />
+        )}
+
+        {currentRoom && currentRoom.gameState === "GAME_OVER" && (
+          <GameOverScreen
+            room={currentRoom}
+            onRestartGame={handleRestartGame}
+            onLeaveRoom={handleLeaveRoom}
           />
         )}
       </Card>

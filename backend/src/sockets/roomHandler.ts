@@ -81,7 +81,7 @@ export function registerRoomHandlers(io: TypedServer, socket: TypedSocket): void
     socket.join(cleanCode);
 
     callback({ success: true });
-    io.to(cleanCode).emit("room_updated", updatedRoom);
+    io.to(cleanCode).emit("room_updated", getPublicGameState(updatedRoom));
   });
 
   // 3. Leave Room & Disconnect handler
@@ -91,7 +91,7 @@ export function registerRoomHandlers(io: TypedServer, socket: TypedSocket): void
       socket.leave(roomCode);
       const updatedRoom = removePlayerFromRoom(roomCode, playerId);
       if (updatedRoom) {
-        io.to(roomCode).emit("room_updated", updatedRoom);
+        io.to(roomCode).emit("room_updated", getPublicGameState(updatedRoom));;
       }
       socket.data.roomCode = undefined;
       socket.data.playerId = undefined;
