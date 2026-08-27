@@ -1,17 +1,23 @@
 import { io, Socket } from "socket.io-client";
+import type { RoomData } from "./types";
 
-// Define the exact same event interfaces for end-to-end type safety
 interface ServerToClientEvents {
-  pong_client: (data: { message: string; timestamp: number }) => void;
+  room_updated: (data: RoomData) => void;
+  error_message: (data: { message: string }) => void;
 }
 
 interface ClientToServerEvents {
-  ping_server: (data: { message: string }) => void;
+  create_room: (
+    data: { playerName: string },
+    callback: (response: { success: boolean; roomCode?: string; error?: string }) => void
+  ) => void;
+  join_room: (
+    data: { roomCode: string; playerName: string },
+    callback: (response: { success: boolean; error?: string }) => void
+  ) => void;
+  leave_room: () => void;
 }
 
-const SERVER_URL = "http://localhost:5000";
-
-// Export typed socket instance
-export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(SERVER_URL, {
+export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io("http://localhost:5000", {
   autoConnect: true,
 });
