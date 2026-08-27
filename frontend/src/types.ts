@@ -49,7 +49,8 @@ export interface PublicGameState {
   currentRound: number;
   category: string;
   clues: ClueEntry[];
-  submittedPlayerIds: string[];
+  currentTurnPlayerId: string | null;
+  timerSecondsRemaining: number;
   votedPlayerIds: string[];
   gameResult: GameResult | null;
 }

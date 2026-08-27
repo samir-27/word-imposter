@@ -1,5 +1,5 @@
 // backend/src/game/roomStore.ts
-import { ActiveGame, Player, PublicGameState, ClueEntry, VoteEntry, VoteTally, GameResult } from "../types/socket.js";
+import { ActiveGame, Player, PublicGameState, ClueEntry, VoteTally } from "../types/socket.js";
 import { getRandomWordPair } from "./wordBank.js";
 
 const rooms = new Map<string, ActiveGame>();
@@ -27,6 +27,8 @@ export function createRoom(hostPlayer: Player): ActiveGame {
     clues: [],
     votes: [],
     gameResult: null,
+    currentTurnIndex: 0,
+    timerSecondsRemaining: 30,
   };
 
   rooms.set(roomCode, newGame);
@@ -86,6 +88,8 @@ export function startGame(roomCode: string, requesterId: string): ActiveGame {
   room.clues = [];
   room.votes = [];
   room.gameResult = null;
+  room.currentTurnIndex = 0;
+  room.timerSecondsRemaining = 30;
 
   return room;
 }
@@ -94,96 +98,76 @@ export function submitClue(roomCode: string, playerId: string, rawClue: string):
   const room = getRoom(roomCode);
   if (!room) throw new Error("Room not found.");
 
-  const player = room.players.find((p) => p.id === playerId);
-  if (!player) throw new Error("Player not in room.");
-
-  const cleanClue = rawClue.trim();
-  if (!cleanClue) throw new Error("Clue cannot be empty.");
-  if (cleanClue.length > 50) throw new Error("Clue must be 50 characters or less.");
+  const currentTurnPlayer = room.players[room.currentTurnIndex];
+  if (!currentTurnPlayer || currentTurnPlayer.id !== playerId) {
+    throw new Error("It is not your turn to give a clue.");
+  }
 
   let currentRoundNum: 1 | 2 | 3 | null = null;
   if (room.gameState === "ROUND_1") currentRoundNum = 1;
   else if (room.gameState === "ROUND_2") currentRoundNum = 2;
   else if (room.gameState === "ROUND_3") currentRoundNum = 3;
 
-  if (currentRoundNum === null) {
+  if (!currentRoundNum) {
     throw new Error("Clues cannot be submitted during this phase.");
   }
 
-  const alreadySubmitted = room.clues.some(
-    (c) => c.playerId === playerId && c.round === currentRoundNum
-  );
-  if (alreadySubmitted) {
-    throw new Error("You have already submitted a clue for this round.");
-  }
+  const cleanClue = rawClue.trim() || "[Timed Out]";
 
   const newClueEntry: ClueEntry = {
-    playerId: player.id,
-    playerName: player.name,
+    playerId: currentTurnPlayer.id,
+    playerName: currentTurnPlayer.name,
     clue: cleanClue,
     round: currentRoundNum,
   };
   room.clues.push(newClueEntry);
 
-  const roundCluesCount = room.clues.filter((c) => c.round === currentRoundNum).length;
+  // Advance turn to next player
+  room.currentTurnIndex += 1;
+  room.timerSecondsRemaining = 30;
 
-  if (roundCluesCount >= room.players.length) {
+  // If every player finished their turn in this round:
+  if (room.currentTurnIndex >= room.players.length) {
+    room.currentTurnIndex = 0; // Reset for next phase
+
     if (room.gameState === "ROUND_1") {
       room.gameState = "ROUND_2";
     } else if (room.gameState === "ROUND_2") {
       room.gameState = "VOTING_1";
+      room.timerSecondsRemaining = 45; // 45 seconds for discussion and voting
     } else if (room.gameState === "ROUND_3") {
       room.gameState = "FINAL_VOTING";
+      room.timerSecondsRemaining = 45;
     }
   }
 
   return room;
 }
 
-// Voting Logic & Resolution
 export function castVote(roomCode: string, voterId: string, targetId: string): ActiveGame {
   const room = getRoom(roomCode);
   if (!room) throw new Error("Room not found.");
 
   if (room.gameState !== "VOTING_1" && room.gameState !== "FINAL_VOTING") {
-    throw new Error("Voting is not currently active.");
+    throw new Error("Voting is not active.");
   }
-
-  const voter = room.players.find((p) => p.id === voterId);
-  if (!voter) throw new Error("Voter not in room.");
 
   const votingRound = room.gameState === "VOTING_1" ? 1 : 2;
 
-  // Validate target selection
   if (targetId === "ANOTHER_ROUND") {
-    if (room.gameState === "FINAL_VOTING") {
-      throw new Error("'Another Round' is not allowed in final voting.");
-    }
+    if (room.gameState === "FINAL_VOTING") throw new Error("'Another Round' not allowed in final voting.");
   } else {
-    const targetPlayerExists = room.players.some((p) => p.id === targetId);
-    if (!targetPlayerExists) {
-      throw new Error("Invalid player selected for vote.");
-    }
+    if (!room.players.some((p) => p.id === targetId)) throw new Error("Invalid target player.");
   }
 
-  // Prevent duplicate voting in this phase
-  const alreadyVoted = room.votes.some(
-    (v) => v.voterId === voterId && v.round === votingRound
-  );
-  if (alreadyVoted) {
-    throw new Error("You have already voted in this round.");
+  if (room.votes.some((v) => v.voterId === voterId && v.round === votingRound)) {
+    throw new Error("You already voted.");
   }
 
-  room.votes.push({
-    voterId,
-    targetId,
-    round: votingRound,
-  });
+  room.votes.push({ voterId, targetId, round: votingRound });
 
-  const currentPhaseVotes = room.votes.filter((v) => v.round === votingRound);
-
-  // If all players have voted, resolve the phase
-  if (currentPhaseVotes.length >= room.players.length) {
+  const currentVotes = room.votes.filter((v) => v.round === votingRound);
+  if (currentVotes.length >= room.players.length) {
     resolveVoting(room, votingRound);
   }
 
@@ -195,13 +179,11 @@ function resolveVoting(room: ActiveGame, votingRound: 1 | 2): void {
   const imposter = room.players.find((p) => p.id === room.imposterId);
   const imposterName = imposter ? imposter.name : "Unknown";
 
-  // Count tallies
   const counts: Record<string, number> = {};
   for (const v of currentVotes) {
     counts[v.targetId] = (counts[v.targetId] || 0) + 1;
   }
 
-  // Format vote tallies for presentation
   const voteTallies: VoteTally[] = Object.entries(counts).map(([id, count]) => {
     let name = "Another Round";
     if (id !== "ANOTHER_ROUND") {
@@ -211,26 +193,18 @@ function resolveVoting(room: ActiveGame, votingRound: 1 | 2): void {
     return { targetId: id, targetName: name, count };
   }).sort((a, b) => b.count - a.count);
 
-  const highestCount = voteTallies[0].count;
+  const highestCount = voteTallies[0]?.count || 0;
   const topCandidates = voteTallies.filter((t) => t.count === highestCount);
 
-  // --- RESOLUTION FOR VOTING 1 (After Round 2) ---
   if (votingRound === 1) {
-    // TIE RULE: If tie for highest vote count -> Round 3 automatically starts
-    if (topCandidates.length > 1) {
+    if (topCandidates.length > 1 || topCandidates[0].targetId === "ANOTHER_ROUND") {
       room.gameState = "ROUND_3";
+      room.currentTurnIndex = 0;
+      room.timerSecondsRemaining = 30;
       return;
     }
 
     const winnerTarget = topCandidates[0].targetId;
-
-    // ANOTHER ROUND RULE: If "ANOTHER_ROUND" gets highest votes -> Round 3 starts
-    if (winnerTarget === "ANOTHER_ROUND") {
-      room.gameState = "ROUND_3";
-      return;
-    }
-
-    // SINGLE PLAYER ACCUSED: Reveal role
     const isImposter = winnerTarget === room.imposterId;
     room.gameState = "GAME_OVER";
     room.gameResult = {
@@ -247,9 +221,7 @@ function resolveVoting(room: ActiveGame, votingRound: 1 | 2): void {
     return;
   }
 
-  // --- RESOLUTION FOR FINAL VOTING (After Round 3) ---
   if (votingRound === 2) {
-    // FINAL TIE RULE: If tie in final voting -> IMPOSTER WINS
     if (topCandidates.length > 1) {
       room.gameState = "GAME_OVER";
       room.gameResult = {
@@ -266,13 +238,12 @@ function resolveVoting(room: ActiveGame, votingRound: 1 | 2): void {
 
     const winnerTarget = topCandidates[0].targetId;
     const isImposter = winnerTarget === room.imposterId;
-
     room.gameState = "GAME_OVER";
     room.gameResult = {
       winner: isImposter ? "PLAYERS" : "IMPOSTER",
       reason: isImposter
         ? "Players caught the Imposter in the final round!"
-        : "The wrong player was voted out in the final round. Imposter wins!",
+        : "The wrong player was voted out. Imposter wins!",
       imposterId: room.imposterId,
       imposterName,
       innocentWord: room.wordPair.innocentWord,
@@ -288,9 +259,9 @@ export function getPublicGameState(room: ActiveGame): PublicGameState {
   else if (room.gameState === "ROUND_2" || room.gameState === "VOTING_1") roundNum = 2;
   else if (room.gameState === "ROUND_3" || room.gameState === "FINAL_VOTING") roundNum = 3;
 
-  const submittedPlayerIds = room.clues
-    .filter((c) => c.round === roundNum)
-    .map((c) => c.playerId);
+  const currentTurnPlayer = ["ROUND_1", "ROUND_2", "ROUND_3"].includes(room.gameState)
+    ? room.players[room.currentTurnIndex]?.id || null
+    : null;
 
   const votingRound = room.gameState === "VOTING_1" ? 1 : room.gameState === "FINAL_VOTING" ? 2 : null;
   const votedPlayerIds = votingRound
@@ -305,7 +276,8 @@ export function getPublicGameState(room: ActiveGame): PublicGameState {
     currentRound: roundNum,
     category: room.wordPair.category,
     clues: room.clues,
-    submittedPlayerIds,
+    currentTurnPlayerId: currentTurnPlayer,
+    timerSecondsRemaining: room.timerSecondsRemaining,
     votedPlayerIds,
     gameResult: room.gameResult,
   };

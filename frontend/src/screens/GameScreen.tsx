@@ -1,6 +1,7 @@
 // frontend/src/screens/GameScreen.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { PublicGameState, SecretRoleData } from "../types";
+import { socket } from "../socket";
 
 interface GameScreenProps {
   room: PublicGameState;
@@ -10,12 +11,25 @@ interface GameScreenProps {
 
 export const GameScreen: React.FC<GameScreenProps> = ({ room, secret, onSubmitClue }) => {
   const [clueInput, setClueInput] = useState("");
+  const [secondsLeft, setSecondsLeft] = useState(room.timerSecondsRemaining);
 
-  // Determine current player's identity via socket id
-  const myPlayer = room.players.find((p) => p.socketId === room.players.find(x => x.name)?.socketId);
-  // Check if this client already submitted for the current round
-  const hasSubmitted = room.submittedPlayerIds.length > 0 && 
-    room.players.some((p) => room.submittedPlayerIds.includes(p.id) && p.socketId === p.socketId);
+  useEffect(() => {
+    setSecondsLeft(room.timerSecondsRemaining);
+  }, [room.timerSecondsRemaining, room.currentTurnPlayerId]);
+
+  useEffect(() => {
+    const handleTick = (data: { secondsRemaining: number }) => {
+      setSecondsLeft(data.secondsRemaining);
+    };
+    socket.on("timer_tick", handleTick);
+    return () => {
+      socket.off("timer_tick", handleTick);
+    };
+  }, []);
+
+  const currentTurnPlayer = room.players.find((p) => p.id === room.currentTurnPlayerId);
+  const isMyTurn = currentTurnPlayer?.socketId === socket.id;
+  const isCluePhase = ["ROUND_1", "ROUND_2", "ROUND_3"].includes(room.gameState);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,10 +38,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({ room, secret, onSubmitCl
     setClueInput("");
   };
 
-  const isCluePhase = ["ROUND_1", "ROUND_2", "ROUND_3"].includes(room.gameState);
+  const timerPercentage = Math.max(0, Math.min(100, (secondsLeft / 30) * 100));
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Header Info */}
       <div className="flex justify-between items-center bg-slate-800/80 px-4 py-3 rounded-xl border border-slate-700">
         <div>
@@ -40,6 +54,16 @@ export const GameScreen: React.FC<GameScreenProps> = ({ room, secret, onSubmitCl
           <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Category</span>
           <div className="text-sm font-semibold text-slate-200">{room.category}</div>
         </div>
+      </div>
+
+      {/* Synchronized Countdown Timer Bar */}
+      <div className="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden border border-slate-700">
+        <div
+          className={`h-full transition-all duration-1000 ease-linear ${
+            secondsLeft <= 5 ? "bg-rose-500 animate-pulse" : "bg-indigo-500"
+          }`}
+          style={{ width: `${timerPercentage}%` }}
+        />
       </div>
 
       {/* Secret Word Card */}
@@ -64,54 +88,64 @@ export const GameScreen: React.FC<GameScreenProps> = ({ room, secret, onSubmitCl
         </div>
       )}
 
-      {/* Clue Submission Form */}
+      {/* Turn Indicator Banner */}
       {isCluePhase && (
-        <form onSubmit={handleSubmit} className="space-y-2">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              maxLength={40}
-              placeholder="Give a one-word or short clue..."
-              value={clueInput}
-              onChange={(e) => setClueInput(e.target.value)}
-              className="flex-1 px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <button
-              type="submit"
-              disabled={!clueInput.trim()}
-              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 font-semibold text-sm rounded-lg shadow transition active:scale-95"
-            >
-              Submit
-            </button>
-          </div>
-          <div className="text-[11px] text-slate-400 text-right">
-            Submitted: {room.submittedPlayerIds.length} / {room.players.length} players
-          </div>
+        <div
+          className={`p-3 rounded-xl border text-center text-sm font-bold ${
+            isMyTurn
+              ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300 animate-pulse"
+              : "bg-slate-800/80 border-slate-700 text-slate-300"
+          }`}
+        >
+          {isMyTurn
+            ? `👉 YOUR TURN TO GIVE A CLUE (${secondsLeft}s)`
+            : `⏳ Waiting for ${currentTurnPlayer?.name || "next player"} (${secondsLeft}s)`}
+        </div>
+      )}
+
+      {/* Clue Input Form */}
+      {isCluePhase && isMyTurn && (
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <input
+            type="text"
+            maxLength={40}
+            autoFocus
+            placeholder="Type your clue..."
+            value={clueInput}
+            onChange={(e) => setClueInput(e.target.value)}
+            className="flex-1 px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+          <button
+            type="submit"
+            disabled={!clueInput.trim()}
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 font-bold text-sm text-white rounded-lg shadow transition active:scale-95"
+          >
+            Submit
+          </button>
         </form>
       )}
 
-      {/* Clues History Feed */}
+      {/* Live Clue Feed */}
       <div className="space-y-2">
         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
           Clues Feed
         </span>
-
         {room.clues.length === 0 ? (
-          <div className="p-4 rounded-lg bg-slate-800/40 border border-slate-800 text-center text-xs text-slate-500">
-            Waiting for clues to be submitted...
+          <div className="p-3 rounded-lg bg-slate-800/40 border border-slate-800 text-center text-xs text-slate-500">
+            First player is preparing a clue...
           </div>
         ) : (
-          <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+          <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
             {room.clues.map((c, idx) => (
               <div
                 key={idx}
-                className="flex items-center justify-between p-2.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-sm"
+                className="flex items-center justify-between p-2 rounded-lg bg-slate-800/80 border border-slate-700/60 text-sm"
               >
                 <div>
                   <span className="font-semibold text-slate-200">{c.playerName}</span>
                   <span className="text-[10px] text-indigo-400 ml-2 font-mono">R{c.round}</span>
                 </div>
-                <div className="font-bold text-white bg-slate-700/60 px-2.5 py-1 rounded border border-slate-600/50">
+                <div className="font-bold text-white bg-slate-700/60 px-2.5 py-0.5 rounded border border-slate-600/50">
                   "{c.clue}"
                 </div>
               </div>
@@ -119,13 +153,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ room, secret, onSubmitCl
           </div>
         )}
       </div>
-
-      {/* Temporary Placeholder when entering Voting Phase */}
-      {!isCluePhase && (
-        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-center font-bold text-sm animate-pulse">
-          Transitioning to {room.gameState.replace("_", " ")} Phase!
-        </div>
-      )}
     </div>
   );
 };

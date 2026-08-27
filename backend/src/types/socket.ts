@@ -20,9 +20,9 @@ export type GameState =
 
 export interface WordPair {
   id: string;
+  category: string;
   innocentWord: string;
   imposterWord: string;
-  category: string;
 }
 
 export interface ClueEntry {
@@ -30,12 +30,6 @@ export interface ClueEntry {
   playerName: string;
   clue: string;
   round: 1 | 2 | 3;
-}
-
-export interface VoteEntry {
-  voterId: string;
-  targetId: string; // Player ID or "ANOTHER_ROUND"
-  round: 1 | 2;     // Voting round 1 (after R2) or voting round 2 (final)
 }
 
 export interface VoteTally {
@@ -62,8 +56,10 @@ export interface ActiveGame {
   imposterId: string;
   wordPair: WordPair;
   clues: ClueEntry[];
-  votes: VoteEntry[];
+  votes: { voterId: string; targetId: string; round: 1 | 2 }[];
   gameResult: GameResult | null;
+  currentTurnIndex: number; // Index in players array whose turn it is to give a clue
+  timerSecondsRemaining: number;
 }
 
 export interface PublicGameState {
@@ -74,7 +70,8 @@ export interface PublicGameState {
   currentRound: number;
   category: string;
   clues: ClueEntry[];
-  submittedPlayerIds: string[];
+  currentTurnPlayerId: string | null;
+  timerSecondsRemaining: number;
   votedPlayerIds: string[];
   gameResult: GameResult | null;
 }
@@ -112,6 +109,7 @@ export interface ClientToServerEvents {
 export interface ServerToClientEvents {
   room_updated: (data: PublicGameState) => void;
   secret_role: (data: SecretRoleData) => void;
+  timer_tick: (data: { secondsRemaining: number }) => void;
   error_message: (data: { message: string }) => void;
 }
 

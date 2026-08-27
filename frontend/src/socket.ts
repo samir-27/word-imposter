@@ -5,6 +5,7 @@ import type { PublicGameState, SecretRoleData } from "./types";
 interface ServerToClientEvents {
   room_updated: (data: PublicGameState) => void;
   secret_role: (data: SecretRoleData) => void;
+  timer_tick: (data: { secondsRemaining: number }) => void;
   error_message: (data: { message: string }) => void;
 }
 
