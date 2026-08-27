@@ -2,7 +2,7 @@
 import "./App.css";
 import { useState, useEffect } from "react";
 import { socket } from "./socket";
-import type  { PublicGameState, SecretRoleData } from "./types";
+import type { PublicGameState, SecretRoleData } from "./types";
 import { Card } from "./components/Card";
 import { Header } from "./components/Header";
 import { ErrorBanner } from "./components/ErrorBanner";
@@ -61,9 +61,14 @@ export default function App() {
   const handleStartGame = () => {
     setError(null);
     socket.emit("start_game", (res) => {
-      if (!res.success && res.error) {
-        setError(res.error);
-      }
+      if (!res.success && res.error) setError(res.error);
+    });
+  };
+
+  const handleSubmitClue = (clue: string) => {
+    setError(null);
+    socket.emit("submit_clue", { clue }, (res) => {
+      if (!res.success && res.error) setError(res.error);
     });
   };
 
@@ -86,7 +91,11 @@ export default function App() {
         )}
 
         {currentRoom && currentRoom.gameState !== "LOBBY" && (
-          <GameScreen room={currentRoom} secret={secretRole} />
+          <GameScreen
+            room={currentRoom}
+            secret={secretRole}
+            onSubmitClue={handleSubmitClue}
+          />
         )}
       </Card>
     </main>

@@ -33,6 +33,7 @@ export interface PublicGameState {
   currentRound: number;
   category: string;
   clues: ClueEntry[];
+  submittedPlayerIds: string[];
 }
 
 export interface SecretRoleData {

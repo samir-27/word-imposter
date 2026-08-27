@@ -50,6 +50,7 @@ export interface PublicGameState {
   currentRound: number;
   category: string;
   clues: ClueEntry[];
+  submittedPlayerIds: string[]; // List of player IDs who submitted for CURRENT round
 }
 
 export interface SecretRoleData {
@@ -70,6 +71,10 @@ export interface ClientToServerEvents {
   ) => void;
   leave_room: () => void;
   start_game: (callback: (response: { success: boolean; error?: string }) => void) => void;
+  submit_clue: (
+    data: { clue: string },
+    callback: (response: { success: boolean; error?: string }) => void
+  ) => void;
 }
 
 // Server -> Client

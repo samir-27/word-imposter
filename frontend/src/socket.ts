@@ -19,6 +19,10 @@ interface ClientToServerEvents {
   ) => void;
   leave_room: () => void;
   start_game: (callback: (response: { success: boolean; error?: string }) => void) => void;
+  submit_clue: (
+    data: { clue: string },
+    callback: (response: { success: boolean; error?: string }) => void
+  ) => void;
 }
 
 export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io("http://localhost:5000", {
