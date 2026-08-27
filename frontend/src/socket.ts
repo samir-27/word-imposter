@@ -1,8 +1,10 @@
+// frontend/src/socket.ts
 import { io, Socket } from "socket.io-client";
-import type { RoomData } from "./types";
+import type { PublicGameState, SecretRoleData } from "./types";
 
 interface ServerToClientEvents {
-  room_updated: (data: RoomData) => void;
+  room_updated: (data: PublicGameState) => void;
+  secret_role: (data: SecretRoleData) => void;
   error_message: (data: { message: string }) => void;
 }
 
@@ -16,6 +18,7 @@ interface ClientToServerEvents {
     callback: (response: { success: boolean; error?: string }) => void
   ) => void;
   leave_room: () => void;
+  start_game: (callback: (response: { success: boolean; error?: string }) => void) => void;
 }
 
 export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io("http://localhost:5000", {

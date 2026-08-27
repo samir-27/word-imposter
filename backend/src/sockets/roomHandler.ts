@@ -13,6 +13,7 @@ import {
   getRoom,
   addPlayerToRoom,
   removePlayerFromRoom,
+  getPublicGameState,
 } from "../game/roomStore.js";
 
 type TypedServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
@@ -41,7 +42,7 @@ export function registerRoomHandlers(io: TypedServer, socket: TypedSocket): void
     socket.join(room.roomCode);
 
     callback({ success: true, roomCode: room.roomCode });
-    io.to(room.roomCode).emit("room_updated", room);
+    io.to(room.roomCode).emit("room_updated", getPublicGameState(room));
   });
 
   // 2. Join Room

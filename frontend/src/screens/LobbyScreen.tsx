@@ -1,11 +1,11 @@
 // frontend/src/screens/LobbyScreen.tsx
 import React from "react";
-import type { RoomData } from "../types";
+import type { PublicGameState } from "../types";
 
 interface LobbyScreenProps {
-  room: RoomData;
+  room: PublicGameState;
   onLeaveRoom: () => void;
-  onStartGame?: () => void;
+  onStartGame: () => void;
 }
 
 export const LobbyScreen: React.FC<LobbyScreenProps> = ({ room, onLeaveRoom, onStartGame }) => {

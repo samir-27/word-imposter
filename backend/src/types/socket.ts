@@ -1,13 +1,15 @@
 // backend/src/types/socket.ts
 
+export type Role = "INNOCENT" | "IMPOSTER";
+
 export interface Player {
-  id: string;        // Unique permanent ID for this session
-  socketId: string;  // Active socket connection ID
-  name: string;      // Display name
+  id: string;
+  socketId: string;
+  name: string;
   isHost: boolean;
 }
 
-export type GameState = 
+export type GameState =
   | "LOBBY"
   | "ROUND_1"
   | "ROUND_2"
@@ -16,30 +18,64 @@ export type GameState =
   | "FINAL_VOTING"
   | "GAME_OVER";
 
-export interface RoomData {
+export interface WordPair {
+  id: string;
+  innocentWord: string;
+  imposterWord: string;
+  category: string;
+}
+
+export interface ClueEntry {
+  playerId: string;
+  playerName: string;
+  clue: string;
+  round: 1 | 2 | 3;
+}
+
+export interface ActiveGame {
   roomCode: string;
   hostId: string;
   gameState: GameState;
   players: Player[];
+  imposterId: string;
+  wordPair: WordPair;
+  clues: ClueEntry[];
 }
 
-// Events emitted FROM Client TO Server
+export interface PublicGameState {
+  roomCode: string;
+  hostId: string;
+  gameState: GameState;
+  players: Player[];
+  currentRound: number;
+  category: string;
+  clues: ClueEntry[];
+}
+
+export interface SecretRoleData {
+  role: Role;
+  word: string;
+  category: string;
+}
+
+// Client -> Server
 export interface ClientToServerEvents {
   create_room: (
     data: { playerName: string },
     callback: (response: { success: boolean; roomCode?: string; error?: string }) => void
   ) => void;
-  
   join_room: (
     data: { roomCode: string; playerName: string },
     callback: (response: { success: boolean; error?: string }) => void
   ) => void;
   leave_room: () => void;
+  start_game: (callback: (response: { success: boolean; error?: string }) => void) => void;
 }
 
-// Events emitted FROM Server TO Client
+// Server -> Client
 export interface ServerToClientEvents {
-  room_updated: (data: RoomData) => void;
+  room_updated: (data: PublicGameState) => void;
+  secret_role: (data: SecretRoleData) => void;
   error_message: (data: { message: string }) => void;
 }
 

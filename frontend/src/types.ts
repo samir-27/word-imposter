@@ -1,3 +1,7 @@
+// frontend/src/types.ts
+
+export type Role = "INNOCENT" | "IMPOSTER";
+
 export interface Player {
   id: string;
   socketId: string;
@@ -5,7 +9,7 @@ export interface Player {
   isHost: boolean;
 }
 
-export type GameState = 
+export type GameState =
   | "LOBBY"
   | "ROUND_1"
   | "ROUND_2"
@@ -14,9 +18,25 @@ export type GameState =
   | "FINAL_VOTING"
   | "GAME_OVER";
 
-export interface RoomData {
+export interface ClueEntry {
+  playerId: string;
+  playerName: string;
+  clue: string;
+  round: 1 | 2 | 3;
+}
+
+export interface PublicGameState {
   roomCode: string;
   hostId: string;
   gameState: GameState;
   players: Player[];
+  currentRound: number;
+  category: string;
+  clues: ClueEntry[];
+}
+
+export interface SecretRoleData {
+  role: Role;
+  word: string;
+  category: string;
 }
